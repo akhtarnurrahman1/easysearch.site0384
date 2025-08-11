@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Penyimpanan File IndexedDB</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Menggunakan font Inter untuk tampilan yang bersih */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <!-- Kontainer utama aplikasi -->
+    <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl w-full max-w-2xl">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Aplikasi Penyimpanan File</h1>
+
+        <!-- Form untuk mengunggah file -->
+        <div class="mb-8 p-6 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Simpan File Baru</h2>
+            <form id="fileForm" class="flex flex-col md:flex-row items-center gap-4">
+                <input type="file" id="fileInput" class="w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-full file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-indigo-50 file:text-indigo-700
+                    hover:file:bg-indigo-100 cursor-pointer"/>
+                <button type="submit" id="saveButton" class="w-full md:w-auto px-6 py-2.5 bg-indigo-600 text-white font-medium text-sm leading-tight uppercase rounded-full shadow-md hover:bg-indigo-700 hover:shadow-lg focus:bg-indigo-700 focus:shadow-lg transition duration-150 ease-in-out">
+                    Simpan
+                </button>
+            </form>
+        </div>
+
+        <!-- Bagian untuk menampilkan file yang sudah disimpan -->
+        <div>
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Daftar File Tersimpan</h2>
+            <div id="fileList" class="space-y-4">
+                <!-- Daftar file akan ditampilkan di sini oleh JavaScript -->
+                <p id="noFilesMessage" class="text-gray-500 text-center">Belum ada file yang disimpan.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kotak pesan kustom (untuk menggantikan alert) -->
+    <div id="messageBox" class="fixed top-4 left-1/2 -translate-x-1/2 p-4 rounded-xl shadow-lg transition-all duration-300 opacity-0 transform -translate-y-full" role="alert">
+        <span id="messageText" class="text-white font-semibold"></span>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Deklarasi konstanta untuk database dan object store
+            const dbName = 'FileStorageDB';
+            const dbVersion = 1;
+            const storeName = 'files';
+
+            // Elemen-elemen DOM
+            const fileForm = document.getElementById('fileForm');
+            const fileInput = document.getElementById('fileInput');
+            const fileList = document.getElementById('fileList');
+            const saveButton = document.getElementById('saveButton');
+            const noFilesMessage = document.getElementById('noFilesMessage');
+            const messageBox = document.getElementById('messageBox');
+            const messageText = document.getElementById('messageText');
+
+            // --- Fungsi untuk menampilkan pesan kustom ---
+            function showMessage(message, type = 'success') {
+                messageText.textContent = message;
+                messageBox.classList.remove('opacity-0', '-translate-y-full');
+                if (type === 'success') {
+                    messageBox.style.backgroundColor = '#10B981'; // Tailwind green-500
+                } else if (type === 'error') {
+                    messageBox.style.backgroundColor = '#EF4444'; // Tailwind red-500
+                } else {
+                    messageBox.style.backgroundColor = '#3B82F6'; // Tailwind blue-500
+                }
+                messageBox.classList.add('opacity-100', 'translate-y-0');
+
+                // Hilangkan pesan setelah 3 detik
+                setTimeout(() => {
+                    messageBox.classList.remove('opacity-100', 'translate-y-0');
+                    messageBox.classList.add('opacity-0', '-translate-y-full');
+                }, 3000);
+            }
+
+            // --- Fungsi untuk membuka atau membuat database IndexedDB ---
+            function openDatabase() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(dbName, dbVersion);
+
+                    request.onupgradeneeded = (event) => {
+                        // Membuat object store jika belum ada
+                        const db = event.target.result;
+                        db.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true });
+                    };
+
+                    request.onsuccess = (event) => {
+                        resolve(event.target.result);
+                    };
+
+                    request.onerror = (event) => {
+                        console.error("Gagal membuka database:", event.target.error);
+                        showMessage("Gagal membuka database.", 'error');
+                        reject(event.target.error);
+                    };
+                });
+            }
+
+            // --- Fungsi untuk menyimpan file ke IndexedDB ---
+            async function saveFile(file) {
+                try {
+                    const db = await openDatabase();
+                    // Mulai transaksi 'readwrite'
+                    const transaction = db.transaction([storeName], 'readwrite');
+                    const store = transaction.objectStore(storeName);
+
+                    // Buat objek file untuk disimpan
+                    const fileToStore = {
+                        name: file.name,
+                        type: file.type,
+                        data: file // Simpan objek File/Blob itu sendiri
+                    };
+
+                    // Tambahkan objek ke object store
+                    const addRequest = store.add(fileToStore);
+                    
+                    // Tangani hasil transaksi
+                    transaction.oncomplete = () => {
+                        console.log("File berhasil disimpan!");
+                        showMessage(`File '${file.name}' berhasil disimpan!`);
+                        displayFiles(); // Perbarui daftar file setelah menyimpan
+                        fileInput.value = ''; // Hapus file yang sudah dipilih
+                    };
+
+                    transaction.onerror = (event) => {
+                        console.error("Gagal menyimpan file:", event.target.error);
+                        showMessage("Gagal menyimpan file.", 'error');
+                    };
+                } catch (error) {
+                    console.error("Kesalahan dalam saveFile:", error);
+                }
+            }
+
+            // --- Fungsi untuk menampilkan semua file dari IndexedDB ---
+            async function displayFiles() {
+                fileList.innerHTML = ''; // Kosongkan daftar sebelum memperbarui
+                try {
+                    const db = await openDatabase();
+                    // Mulai transaksi 'readonly'
+                    const transaction = db.transaction([storeName], 'readonly');
+                    const store = transaction.objectStore(storeName);
+
+                    const getAllRequest = store.getAll();
+
+                    getAllRequest.onsuccess = (event) => {
+                        const files = event.target.result;
+                        if (files.length === 0) {
+                            noFilesMessage.classList.remove('hidden');
+                        } else {
+                            noFilesMessage.classList.add('hidden');
+                            files.forEach(fileData => {
+                                const fileItem = document.createElement('div');
+                                fileItem.className = 'flex items-center justify-between p-4 bg-gray-100 rounded-lg shadow-sm hover:bg-gray-200 transition';
+
+                                // Buat URL objek untuk file (Blob)
+                                const fileUrl = URL.createObjectURL(fileData.data);
+                                
+                                const fileNameLink = document.createElement('a');
+                                fileNameLink.href = fileUrl;
+                                fileNameLink.target = '_blank'; // Buka di tab baru
+                                fileNameLink.textContent = fileData.name;
+                                fileNameLink.className = 'text-blue-600 hover:underline font-medium truncate';
+
+                                fileItem.appendChild(fileNameLink);
+                                fileList.appendChild(fileItem);
+                            });
+                        }
+                    };
+
+                    getAllRequest.onerror = (event) => {
+                        console.error("Gagal mendapatkan file:", event.target.error);
+                    };
+                } catch (error) {
+                    console.error("Kesalahan dalam displayFiles:", error);
+                }
+            }
+
+            // --- Event Listener untuk form submission ---
+            fileForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+                const file = fileInput.files[0];
+
+                if (file) {
+                    saveButton.disabled = true;
+                    saveButton.textContent = "Menyimpan...";
+                    saveFile(file).finally(() => {
+                        saveButton.disabled = false;
+                        saveButton.textContent = "Simpan";
+                    });
+                } else {
+                    showMessage("Pilih file terlebih dahulu.", 'error');
+                }
+            });
+
+            // Panggil fungsi displayFiles saat halaman dimuat
+            displayFiles();
+        });
+    </script>
+</body>
+</html>

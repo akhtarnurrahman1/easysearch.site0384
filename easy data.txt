@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Spreadsheet Seperti Excel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .cell-input {
+            border: none;
+            outline: none;
+            background: transparent;
+            width: 100%;
+            height: 100%;
+            padding: 0 8px;
+        }
+        
+        .selected-cell {
+            box-shadow: 0 0 0 2px #10b981;
+            background-color: #dbeafe;
+        }
+        
+        .grid-container {
+            overflow: auto;
+            max-height: calc(100vh - 200px);
+        }
+        
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: #f3f4f6;
+        }
+        
+        .sticky-row-header {
+            position: sticky;
+            left: 0;
+            z-index: 5;
+            background: #f3f4f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app" class="h-screen flex flex-col">
+        <!-- Header -->
+        <div class="bg-green-600 text-white p-4">
+            <h1 class="text-2xl font-bold">Excel Clone</h1>
+            <p class="text-green-100 text-sm">Aplikasi spreadsheet dengan fitur formula dan kalkulasi</p>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="bg-white border-b border-gray-300 p-2 flex items-center gap-2">
+            <button id="saveBtn" class="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm">
+                💾 Simpan
+            </button>
+            
+            <button id="exportBtn" class="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm">
+                📥 Export
+            </button>
+            
+            <label class="flex items-center gap-2 px-3 py-1.5 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors text-sm cursor-pointer">
+                📤 Import
+                <input type="file" id="importFile" accept=".json" class="hidden">
+            </label>
+            
+            <button id="clearBtn" class="flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm">
+                🗑️ Bersihkan
+            </button>
+            
+            <div class="ml-auto text-sm text-gray-600">
+                Tips: Gunakan formula seperti =A1+B1, =SUM(A1:A5), =AVG(B1:B10)
+            </div>
+        </div>
+
+        <!-- Formula Bar -->
+        <div class="bg-white border-b border-gray-300 p-2 flex items-center gap-2">
+            <div class="flex items-center gap-2">
+                <div id="cellReference" class="w-16 px-2 py-1 border border-gray-300 rounded text-sm font-medium text-center bg-gray-50">
+                    A1
+                </div>
+                <div class="text-gray-500">fx</div>
+            </div>
+            <input
+                type="text"
+                id="formulaInput"
+                class="flex-1 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                placeholder="Ketik formula atau nilai..."
+            >
+        </div>
+
+        <!-- Spreadsheet Grid -->
+        <div class="flex-1 grid-container bg-gray-50">
+            <div id="spreadsheetGrid" class="inline-block"></div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="bg-gray-200 border-t border-gray-300 p-2 text-sm text-gray-600">
+            <span id="statusText">Siap | 0 sel terisi | Auto-save aktif</span>
+        </div>
+    </div>
+
+    <script>
+        class SpreadsheetApp {
+            constructor() {
+                this.data = this.loadFromLocalStorage();
+                this.selectedCell = { row: 0, col: 0 };
+                this.editingCell = null;
+                this.rows = 50;
+                this.cols = 26;
+                
+                this.init();
+                this.render();
+                this.setupEventListeners();
+                this.updateFormulaBar();
+                this.updateStatus();
+                
+                // Auto-save every 30 seconds
+                setInterval(() => {
+                    this.saveToLocalStorage();
+                }, 30000);
+            }
+
+            init() {
+                this.formulaInput = document.getElementById('formulaInput');
+                this.cellReference = document.getElementById('cellReference');
+                this.statusText = document.getElementById('statusText');
+                this.gridContainer = document.getElementById('spreadsheetGrid');
+            }
+
+            columnIndexToLetter(index) {
+                let result = '';
+                while (index >= 0) {
+                    result = String.fromCharCode(65 + (index % 26)) + result;
+                    index = Math.floor(index / 26) - 1;
+                }
+                return result;
+            }
+
+            letterToColumnIndex(letter) {
+                let result = 0;
+                for (let i = 0; i < letter.length; i++) {
+                    result = result * 26 + (letter.charCodeAt(i) - 64);
+                }
+                return result - 1;
+            }
+
+            getCellKey(row, col) {
+                return `${this.columnIndexToLetter(col)}${row + 1}`;
+            }
+
+            parseCellKey(key) {
+                const match = key.match(/^([A-Z]+)(\d+)$/);
+                if (!match) throw new Error('Invalid cell key');
+                
+                const col = this.letterToColumnIndex(match[1]);
+                const row = parseInt(match[2]) - 1;
+                
+                return { row, col };
+            }
+
+            evaluateFormula(formula) {
+                try {
+                    let expression = formula.substring(1);
+                    
+                    // Handle SUM function
+                    const sumMatch = expression.match(/SUM\(([A-Z]+\d+):([A-Z]+\d+)\)/);
+                    if (sumMatch) {
+                        const startCell = this.parseCellKey(sumMatch[1]);
+                        const endCell = this.parseCellKey(sumMatch[2]);
+                        let sum = 0;
+                        
+                        for (let row = startCell.row; row <= endCell.row; row++) {
+                            for (let col = startCell.col; col <= endCell.col; col++) {
+                                const cellKey = this.getCellKey(row, col);
+                                const cellValue = this.data[cellKey]?.displayValue || '0';
+                                const numValue = parseFloat(cellValue);
+                                if (!isNaN(numValue)) {
+                                    sum += numValue;
+                                }
+                            }
+                        }
+                        
+                        return sum.toString();
+                    }
+                    
+                    // Handle AVG function
+                    const avgMatch = expression.match(/AVG\(([A-Z]+\d+):([A-Z]+\d+)\)/);
+                    if (avgMatch) {
+                        const startCell = this.parseCellKey(avgMatch[1]);
+                        const endCell = this.parseCellKey(avgMatch[2]);
+                        let sum = 0;
+                        let count = 0;
+                        
+                        for (let row = startCell.row; row <= endCell.row; row++) {
+                            for (let col = startCell.col; col <= endCell.col; col++) {
+                                const cellKey = this.getCellKey(row, col);
+                                const cellValue = this.data[cellKey]?.displayValue || '0';
+                                const numValue = parseFloat(cellValue);
+                                if (!isNaN(numValue)) {
+                                    sum += numValue;
+                                    count++;
+                                }
+                            }
+                        }
+                        
+                        return count > 0 ? (sum / count).toString() : '0';
+                    }
+                    
+                    // Replace cell references with their values
+                    expression = expression.replace(/[A-Z]+\d+/g, (match) => {
+                        const cellValue = this.data[match]?.displayValue || '0';
+                        const numValue = parseFloat(cellValue);
+                        return isNaN(numValue) ? '0' : numValue.toString();
+                    });
+                    
+                    // Evaluate simple mathematical expressions
+                    const result = Function(`"use strict"; return (${expression})`)();
+                    return result.toString();
+                } catch (error) {
+                    return '#ERROR';
+                }
+            }
+
+            updateCell(row, col, value) {
+                const cellKey = this.getCellKey(row, col);
+                
+                if (value === '') {
+                    delete this.data[cellKey];
+                } else {
+                    const isFormula = value.startsWith('=');
+                    const cell = {
+                        value,
+                        displayValue: isFormula ? this.evaluateFormula(value) : value,
+                        formula: isFormula ? value : undefined,
+                    };
+                    
+                    this.data[cellKey] = cell;
+                    
+                    // Recalculate all formulas
+                    Object.keys(this.data).forEach(key => {
+                        const existingCell = this.data[key];
+                        if (existingCell.formula) {
+                            existingCell.displayValue = this.evaluateFormula(existingCell.formula);
+                        }
+                    });
+                }
+                
+                this.render();
+                this.updateStatus();
+            }
+
+            render() {
+                let html = '';
+                
+                // Header Row
+                html += '<div class="flex sticky-header">';
+                html += '<div class="w-12 h-8 bg-gray-200 border border-gray-300 flex items-center justify-center text-xs font-medium"></div>';
+                for (let col = 0; col < this.cols; col++) {
+                    html += `<div class="w-24 h-8 bg-gray-200 border border-gray-300 flex items-center justify-center text-xs font-medium">
+                        ${this.columnIndexToLetter(col)}
+                    </div>`;
+                }
+                html += '</div>';
+
+                // Data Rows
+                for (let row = 0; row < this.rows; row++) {
+                    html += '<div class="flex">';
+                    html += `<div class="w-12 h-8 bg-gray-200 border border-gray-300 flex items-center justify-center text-xs font-medium sticky-row-header">
+                        ${row + 1}
+                    </div>`;
+                    
+                    for (let col = 0; col < this.cols; col++) {
+                        const cellKey = this.getCellKey(row, col);
+                        const cell = this.data[cellKey];
+                        const isSelected = this.selectedCell.row === row && this.selectedCell.col === col;
+                        const isEditing = this.editingCell && this.editingCell.row === row && this.editingCell.col === col;
+                        
+                        html += `<div 
+                            class="relative w-24 h-8 border border-gray-300 flex items-center justify-start px-2 cursor-cell hover:bg-blue-50 transition-colors ${isSelected ? 'selected-cell' : 'bg-white'}"
+                            data-row="${row}" 
+                            data-col="${col}"
+                            onclick="app.selectCell(${row}, ${col})"
+                            ondblclick="app.startEditing(${row}, ${col})"
+                        >`;
+                        
+                        if (isEditing) {
+                            html += `<input 
+                                type="text" 
+                                class="cell-input text-sm" 
+                                value="${cell?.formula || cell?.value || ''}"
+                                onblur="app.finishEditing(this.value)"
+                                onkeydown="app.handleEditKeyDown(event, this.value)"
+                                id="editInput"
+                            >`;
+                        } else {
+                            html += `<span class="text-sm truncate w-full">${cell?.displayValue || ''}</span>`;
+                        }
+                        
+                        html += '</div>';
+                    }
+                    html += '</div>';
+                }
+                
+                this.gridContainer.innerHTML = html;
+                
+                // Focus edit input if editing
+                if (this.editingCell) {
+                    setTimeout(() => {
+                        const editInput = document.getElementById('editInput');
+                        if (editInput) {
+                            editInput.focus();
+                            editInput.select();
+                        }
+                    }, 0);
+                }
+            }
+
+            selectCell(row, col) {
+                this.selectedCell = { row, col };
+                this.editingCell = null;
+                this.render();
+                this.updateFormulaBar();
+            }
+
+            startEditing(row, col) {
+                this.selectedCell = { row, col };
+                this.editingCell = { row, col };
+                this.render();
+            }
+
+            finishEditing(value) {
+                if (this.editingCell) {
+                    this.updateCell(this.editingCell.row, this.editingCell.col, value);
+                    this.editingCell = null;
+                    this.updateFormulaBar();
+                }
+            }
+
+            handleEditKeyDown(event, value) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    this.finishEditing(value);
+                } else if (event.key === 'Escape') {
+                    event.preventDefault();
+                    this.editingCell = null;
+                    this.render();
+                }
+            }
+
+            updateFormulaBar() {
+                const cellKey = this.getCellKey(this.selectedCell.row, this.selectedCell.col);
+                const cell = this.data[cellKey];
+                this.cellReference.textContent = cellKey;
+                this.formulaInput.value = cell?.formula || cell?.value || '';
+            }
+
+            updateStatus() {
+                const cellCount = Object.keys(this.data).length;
+                this.statusText.textContent = `Siap | ${cellCount} sel terisi | Auto-save aktif`;
+            }
+
+            setupEventListeners() {
+                // Formula input
+                this.formulaInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        this.updateCell(this.selectedCell.row, this.selectedCell.col, this.formulaInput.value);
+                        this.updateFormulaBar();
+                    }
+                });
+
+                // Keyboard navigation
+                document.addEventListener('keydown', (e) => {
+                    if (this.editingCell) return;
+
+                    switch (e.key) {
+                        case 'ArrowUp':
+                            e.preventDefault();
+                            if (this.selectedCell.row > 0) {
+                                this.selectCell(this.selectedCell.row - 1, this.selectedCell.col);
+                            }
+                            break;
+                        case 'ArrowDown':
+                            e.preventDefault();
+                            if (this.selectedCell.row < this.rows - 1) {
+                                this.selectCell(this.selectedCell.row + 1, this.selectedCell.col);
+                            }
+                            break;
+                        case 'ArrowLeft':
+                            e.preventDefault();
+                            if (this.selectedCell.col > 0) {
+                                this.selectCell(this.selectedCell.row, this.selectedCell.col - 1);
+                            }
+                            break;
+                        case 'ArrowRight':
+                            e.preventDefault();
+                            if (this.selectedCell.col < this.cols - 1) {
+                                this.selectCell(this.selectedCell.row, this.selectedCell.col + 1);
+                            }
+                            break;
+                        case 'Enter':
+                            e.preventDefault();
+                            this.startEditing(this.selectedCell.row, this.selectedCell.col);
+                            break;
+                        case 'Delete':
+                        case 'Backspace':
+                            e.preventDefault();
+                            this.updateCell(this.selectedCell.row, this.selectedCell.col, '');
+                            this.updateFormulaBar();
+                            break;
+                        default:
+                            if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                                this.startEditing(this.selectedCell.row, this.selectedCell.col);
+                                setTimeout(() => {
+                                    const editInput = document.getElementById('editInput');
+                                    if (editInput) {
+                                        editInput.value = e.key;
+                                    }
+                                }, 0);
+                            }
+                            break;
+                    }
+                });
+
+                // Toolbar buttons
+                document.getElementById('saveBtn').addEventListener('click', () => {
+                    this.saveToLocalStorage();
+                    alert('Data berhasil disimpan!');
+                });
+
+                document.getElementById('exportBtn').addEventListener('click', () => {
+                    this.exportData();
+                });
+
+                document.getElementById('importFile').addEventListener('change', (e) => {
+                    this.importData(e);
+                });
+
+                document.getElementById('clearBtn').addEventListener('click', () => {
+                    if (confirm('Yakin ingin menghapus semua data?')) {
+                        this.data = {};
+                        localStorage.removeItem('spreadsheet-data');
+                        this.render();
+                        this.updateFormulaBar();
+                        this.updateStatus();
+                    }
+                });
+            }
+
+            saveToLocalStorage() {
+                localStorage.setItem('spreadsheet-data', JSON.stringify(this.data));
+            }
+
+            loadFromLocalStorage() {
+                const saved = localStorage.getItem('spreadsheet-data');
+                return saved ? JSON.parse(saved) : {};
+            }
+
+            exportData() {
+                const dataStr = JSON.stringify(this.data, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'spreadsheet-data.json';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }
+
+            importData(event) {
+                const file = event.target.files?.[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            this.data = JSON.parse(e.target.result);
+                            this.render();
+                            this.updateFormulaBar();
+                            this.updateStatus();
+                            alert('Data berhasil diimport!');
+                        } catch (error) {
+                            alert('Error importing file: Invalid format');
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            }
+        }
+
+        // Initialize the app
+        const app = new SpreadsheetApp();
+    </script>
+</body>
+</html>

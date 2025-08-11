@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PowerPoint & Code Editor Suite</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            text-align: center;
+            color: #4a5568;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        .tab-container {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .tab-button {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            margin: 0 10px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .tab-button:hover {
+            background: #3182ce;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+        }
+
+        .tab-button.active {
+            background: #2b6cb0;
+            transform: translateY(-2px);
+        }
+
+        .tab-content {
+            display: none;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* PowerPoint Styles */
+        .powerpoint-container {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 20px;
+            height: 70vh;
+        }
+
+        .slides-panel {
+            background: #f7fafc;
+            border-radius: 10px;
+            padding: 20px;
+            overflow-y: auto;
+            border: 2px solid #e2e8f0;
+        }
+
+        .slides-panel h3 {
+            margin-bottom: 15px;
+            color: #4a5568;
+            font-size: 1.2rem;
+        }
+
+        .slide-item {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .slide-item:hover {
+            border-color: #4299e1;
+            transform: translateX(5px);
+        }
+
+        .slide-item.active {
+            border-color: #3182ce;
+            background: #ebf8ff;
+        }
+
+        .main-editor {
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            gap: 15px;
+        }
+
+        .editor-toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar-btn {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+
+        .toolbar-btn:hover {
+            background: #3182ce;
+        }
+
+        .slide-editor {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 40px;
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .slide-content {
+            width: 100%;
+            height: 100%;
+            outline: none;
+            font-size: 18px;
+            line-height: 1.6;
+        }
+
+        .presentation-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Code Editor Styles */
+        .code-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            height: 70vh;
+        }
+
+        .code-editor-panel {
+            display: flex;
+            flex-direction: column;
+            background: #1a202c;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .editor-header {
+            background: #2d3748;
+            padding: 15px;
+            color: white;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .language-select {
+            background: #4a5568;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .code-editor {
+            flex: 1;
+            background: #1a202c;
+            color: #e2e8f0;
+            border: none;
+            padding: 20px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            resize: none;
+            outline: none;
+        }
+
+        .preview-panel {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid #e2e8f0;
+        }
+
+        .preview-header {
+            background: #f7fafc;
+            padding: 15px;
+            font-weight: 600;
+            color: #4a5568;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .preview-content {
+            height: calc(100% - 60px);
+            padding: 0;
+            overflow: auto;
+        }
+
+        .preview-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: white;
+        }
+
+        .code-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .fullscreen-mode {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: black;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .fullscreen-slide {
+            background: white;
+            width: 90vw;
+            height: 90vh;
+            border-radius: 10px;
+            padding: 60px;
+            font-size: 24px;
+            line-height: 1.6;
+            overflow: auto;
+        }
+
+        .fullscreen-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+
+        .fullscreen-btn {
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .powerpoint-container,
+            .code-container {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+            
+            .slides-panel {
+                height: 200px;
+            }
+        }
+
+        /* Syntax highlighting for HTML */
+        .highlight-tag { color: #e06c75; }
+        .highlight-attr { color: #d19a66; }
+        .highlight-value { color: #98c379; }
+        .highlight-comment { color: #5c6370; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎨 PowerPoint & Code Editor Suite</h1>
+            <div class="tab-container">
+                <button class="tab-button active" onclick="switchTab('powerpoint')">📊 PowerPoint</button>
+                <button class="tab-button" onclick="switchTab('codeeditor')">💻 Code Editor</button>
+            </div>
+        </div>
+
+        <!-- PowerPoint Tab -->
+        <div id="powerpoint" class="tab-content active">
+            <div class="powerpoint-container">
+                <div class="slides-panel">
+                    <h3>📋 Slides</h3>
+                    <div id="slides-list">
+                        <div class="slide-item active" onclick="selectSlide(0)">
+                            Slide 1
+                        </div>
+                    </div>
+                </div>
+
+                <div class="main-editor">
+                    <div class="editor-toolbar">
+                        <button class="toolbar-btn" onclick="addSlide()">➕ Add Slide</button>
+                        <button class="toolbar-btn" onclick="deleteSlide()">🗑️ Delete</button>
+                        <button class="toolbar-btn" onclick="changeTheme()">🎨 Theme</button>
+                        <button class="toolbar-btn" onclick="insertImage()">🖼️ Image</button>
+                        <button class="toolbar-btn" onclick="startPresentation()">▶️ Present</button>
+                    </div>
+
+                    <div class="slide-editor" id="slide-editor">
+                        <div class="slide-content" contenteditable="true" id="slide-content">
+                            <h1>Welcome to PowerPoint Suite</h1>
+                            <p>Click here to start editing your presentation...</p>
+                            <ul>
+                                <li>Create amazing slides</li>
+                                <li>Add images and content</li>
+                                <li>Present in fullscreen mode</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="presentation-controls">
+                        <div>
+                            <span>Slide <span id="current-slide">1</span> of <span id="total-slides">1</span></span>
+                        </div>
+                        <div>
+                            <button class="toolbar-btn" onclick="previousSlide()">⬅️ Previous</button>
+                            <button class="toolbar-btn" onclick="nextSlide()">➡️ Next</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Code Editor Tab -->
+        <div id="codeeditor" class="tab-content">
+            <div class="code-toolbar">
+                <button class="toolbar-btn" onclick="newFile()">📄 New</button>
+                <button class="toolbar-btn" onclick="saveFile()">💾 Save</button>
+                <button class="toolbar-btn" onclick="loadFile()">📁 Load</button>
+                <button class="toolbar-btn" onclick="formatCode()">✨ Format</button>
+                <button class="toolbar-btn" onclick="fullscreenCode()">🖥️ Fullscreen</button>
+            </div>
+
+            <div class="code-container">
+                <div class="code-editor-panel">
+                    <div class="editor-header">
+                        <span>💻 Code Editor</span>
+                        <select class="language-select" onchange="changeLanguage()" id="language-select">
+                            <option value="html">HTML</option>
+                            <option value="css">CSS</option>
+                            <option value="javascript">JavaScript</option>
+                        </select>
+                    </div>
+                    <textarea class="code-editor" id="code-editor" placeholder="// Start coding here..."><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Preview</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            color: #fff;
+            text-align: center;
+        }
+        .button {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        .button:hover {
+            background: #3182ce;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Real-time Code Editor</h1>
+        <p>This is a live preview of your HTML code!</p>
+        <button class="button" onclick="alert('Hello World!')">Click Me!</button>
+        <p>Edit the code on the left to see changes here instantly.</p>
+    </div>
+    
+    <script>
+        console.log("Code editor is working!");
+    </script>
+</body>
+</html></textarea>
+                </div>
+
+                <div class="preview-panel">
+                    <div class="preview-header">
+                        <span>👁️ Live Preview</span>
+                        <button class="toolbar-btn" onclick="refreshPreview()">🔄 Refresh</button>
+                    </div>
+                    <div class="preview-content">
+                        <iframe class="preview-iframe" id="preview-iframe"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fullscreen Presentation Overlay -->
+    <div id="fullscreen-presentation" class="fullscreen-mode" style="display: none;">
+        <div class="fullscreen-slide" id="fullscreen-slide-content"></div>
+        <div class="fullscreen-controls">
+            <button class="fullscreen-btn" onclick="previousSlideFullscreen()">⬅️ Previous</button>
+            <button class="fullscreen-btn" onclick="exitFullscreen()">❌ Exit</button>
+            <button class="fullscreen-btn" onclick="nextSlideFullscreen()">➡️ Next</button>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentSlideIndex = 0;
+        let slides = [
+            {
+                content: `<h1>Welcome to PowerPoint Suite</h1>
+                         <p>Click here to start editing your presentation...</p>
+                         <ul>
+                             <li>Create amazing slides</li>
+                             <li>Add images and content</li>
+                             <li>Present in fullscreen mode</li>
+                         </ul>`,
+                theme: 'default'
+            }
+        ];
+
+        let themes = [
+            { name: 'default', background: 'white', color: '#333' },
+            { name: 'blue', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: 'white' },
+            { name: 'green', background: 'linear-gradient(135deg, #11998e, #38ef7d)', color: 'white' },
+            { name: 'purple', background: 'linear-gradient(135deg, #a8edea, #fed6e3)', color: '#333' },
+            { name: 'dark', background: '#1a202c', color: '#e2e8f0' }
+        ];
+
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+            
+            if (tabName === 'codeeditor') {
+                updatePreview();
+            }
+        }
+
+        // PowerPoint Functions
+        function addSlide() {
+            const newSlide = {
+                content: `<h1>New Slide ${slides.length + 1}</h1><p>Edit this slide content...</p>`,
+                theme: 'default'
+            };
+            slides.push(newSlide);
+            updateSlidesList();
+            selectSlide(slides.length - 1);
+        }
+
+        function deleteSlide() {
+            if (slides.length > 1) {
+                slides.splice(currentSlideIndex, 1);
+                if (currentSlideIndex >= slides.length) {
+                    currentSlideIndex = slides.length - 1;
+                }
+                updateSlidesList();
+                selectSlide(currentSlideIndex);
+            } else {
+                alert('Cannot delete the last slide!');
+            }
+        }
+
+        function selectSlide(index) {
+            // Save current slide content
+            if (slides[currentSlideIndex]) {
+                slides[currentSlideIndex].content = document.getElementById('slide-content').innerHTML;
+            }
+            
+            currentSlideIndex = index;
+            document.getElementById('slide-content').innerHTML = slides[index].content;
+            
+            // Update active slide in list
+            document.querySelectorAll('.slide-item').forEach((item, i) => {
+                item.classList.toggle('active', i === index);
+            });
+            
+            updateSlideCounter();
+            applySlideTheme();
+        }
+
+        function updateSlidesList() {
+            const slidesList = document.getElementById('slides-list');
+            slidesList.innerHTML = '';
+            
+            slides.forEach((slide, index) => {
+                const slideItem = document.createElement('div');
+                slideItem.className = `slide-item ${index === currentSlideIndex ? 'active' : ''}`;
+                slideItem.textContent = `Slide ${index + 1}`;
+                slideItem.onclick = () => selectSlide(index);
+                slidesList.appendChild(slideItem);
+            });
+            
+            updateSlideCounter();
+        }
+
+        function updateSlideCounter() {
+            document.getElementById('current-slide').textContent = currentSlideIndex + 1;
+            document.getElementById('total-slides').textContent = slides.length;
+        }
+
+        function changeTheme() {
+            const currentTheme = slides[currentSlideIndex].theme || 'default';
+            const themeNames = themes.map(t => t.name);
+            const currentIndex = themeNames.indexOf(currentTheme);
+            const nextIndex = (currentIndex + 1) % themes.length;
+            
+            slides[currentSlideIndex].theme = themeNames[nextIndex];
+            applySlideTheme();
+        }
+
+        function applySlideTheme() {
+            const theme = themes.find(t => t.name === slides[currentSlideIndex].theme) || themes[0];
+            const slideEditor = document.getElementById('slide-editor');
+            slideEditor.style.background = theme.background;
+            slideEditor.style.color = theme.color;
+        }
+
+        function insertImage() {
+            const imageUrl = prompt('Enter image URL:');
+            if (imageUrl) {
+                const slideContent = document.getElementById('slide-content');
+                slideContent.innerHTML += `<br><img src="${imageUrl}" style="max-width: 100%; height: auto; border-radius: 8px;" alt="Inserted image">`;
+            }
+        }
+
+        function previousSlide() {
+            if (currentSlideIndex > 0) {
+                selectSlide(currentSlideIndex - 1);
+            }
+        }
+
+        function nextSlide() {
+            if (currentSlideIndex < slides.length - 1) {
+                selectSlide(currentSlideIndex + 1);
+            }
+        }
+
+        function startPresentation() {
+            document.getElementById('fullscreen-presentation').style.display = 'flex';
+            showFullscreenSlide(currentSlideIndex);
+        }
+
+        function showFullscreenSlide(index) {
+            const theme = themes.find(t => t.name === slides[index].theme) || themes[0];
+            const fullscreenContent = document.getElementById('fullscreen-slide-content');
+            fullscreenContent.innerHTML = slides[index].content;
+            fullscreenContent.style.background = theme.background;
+            fullscreenContent.style.color = theme.color;
+        }
+
+        function previousSlideFullscreen() {
+            if (currentSlideIndex > 0) {
+                currentSlideIndex--;
+                showFullscreenSlide(currentSlideIndex);
+            }
+        }
+
+        function nextSlideFullscreen() {
+            if (currentSlideIndex < slides.length - 1) {
+                currentSlideIndex++;
+                showFullscreenSlide(currentSlideIndex);
+            }
+        }
+
+        function exitFullscreen() {
+            document.getElementById('fullscreen-presentation').style.display = 'none';
+        }
+
+        // Code Editor Functions
+        function updatePreview() {
+            const code = document.getElementById('code-editor').value;
+            const iframe = document.getElementById('preview-iframe');
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            iframeDoc.open();
+            iframeDoc.write(code);
+            iframeDoc.close();
+        }
+
+        function changeLanguage() {
+            const language = document.getElementById('language-select').value;
+            const editor = document.getElementById('code-editor');
+            
+            switch(language) {
+                case 'html':
+                    editor.placeholder = '<!-- Write your HTML here -->';
+                    break;
+                case 'css':
+                    editor.placeholder = '/* Write your CSS here */\nbody {\n    font-family: Arial, sans-serif;\n}';
+                    break;
+                case 'javascript':
+                    editor.placeholder = '// Write your JavaScript here\nconsole.log("Hello World!");';
+                    break;
+            }
+        }
+
+        function newFile() {
+            document.getElementById('code-editor').value = '';
+            updatePreview();
+        }
+
+        function saveFile() {
+            const content = document.getElementById('code-editor').value;
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'code-file.html';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function loadFile() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.html,.css,.js,.txt';
+            input.onchange = function(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        document.getElementById('code-editor').value = e.target.result;
+                        updatePreview();
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            input.click();
+        }
+
+        function formatCode() {
+            const editor = document.getElementById('code-editor');
+            let code = editor.value;
+            
+            // Simple HTML formatting
+            code = code.replace(/></g, '>\n<');
+            code = code.replace(/^\s+|\s+$/g, '');
+            
+            const lines = code.split('\n');
+            let indentLevel = 0;
+            const indentSize = 2;
+            
+            const formattedLines = lines.map(line => {
+                line = line.trim();
+                if (line.includes('</') && !line.includes('<!--')) {
+                    indentLevel = Math.max(0, indentLevel - 1);
+                }
+                
+                const formattedLine = ' '.repeat(indentLevel * indentSize) + line;
+                
+                if (line.includes('<') && !line.includes('</') && !line.includes('<!--') && !line.endsWith('/>')) {
+                    indentLevel++;
+                }
+                
+                return formattedLine;
+            });
+            
+            editor.value = formattedLines.join('\n');
+            updatePreview();
+        }
+
+        function refreshPreview() {
+            updatePreview();
+        }
+
+        function fullscreenCode() {
+            const editor = document.getElementById('code-editor');
+            if (editor.requestFullscreen) {
+                editor.requestFullscreen();
+            }
+        }
+
+        // Event Listeners
+        document.getElementById('code-editor').addEventListener('input', updatePreview);
+
+        // Save slide content when editing
+        document.getElementById('slide-content').addEventListener('input', function() {
+            slides[currentSlideIndex].content = this.innerHTML;
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(event) {
+            if (event.ctrlKey || event.metaKey) {
+                switch(event.key) {
+                    case 's':
+                        event.preventDefault();
+                        if (document.getElementById('codeeditor').classList.contains('active')) {
+                            saveFile();
+                        }
+                        break;
+                    case 'n':
+                        event.preventDefault();
+                        if (document.getElementById('powerpoint').classList.contains('active')) {
+                            addSlide();
+                        } else {
+                            newFile();
+                        }
+                        break;
+                }
+            }
+            
+            // Presentation navigation
+            if (document.getElementById('fullscreen-presentation').style.display === 'flex') {
+                switch(event.key) {
+                    case 'ArrowLeft':
+                        previousSlideFullscreen();
+                        break;
+                    case 'ArrowRight':
+                        nextSlideFullscreen();
+                        break;
+                    case 'Escape':
+                        exitFullscreen();
+                        break;
+                }
+            }
+        });
+
+        // Initialize
+        updateSlidesList();
+        updatePreview();
+        applySlideTheme();
+    </script>
+</body>
+</html>
